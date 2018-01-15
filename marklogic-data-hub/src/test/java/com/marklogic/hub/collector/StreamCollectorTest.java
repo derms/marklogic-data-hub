@@ -60,8 +60,10 @@ public class StreamCollectorTest extends HubTestBase {
 
         installHub();
 
-        enableDebugging();
-        enableTracing();
+        // turn off tracing and debugging so this doesn't blow up
+        // can't trace the entire uris dump
+        disableDebugging();
+        disableTracing();
 
         Scaffolding scaffolding = new Scaffolding(projectDir.toString(), stagingClient);
         scaffolding.createEntity(ENTITY);
