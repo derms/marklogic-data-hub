@@ -1,56 +1,43 @@
 package com.marklogic.gradle.task
 
-import com.marklogic.gradle.exception.EntityNameRequiredException
+import com.marklogic.gradle.exception.FlowAlreadyPresentException
 import com.marklogic.gradle.exception.FlowNameRequiredException
-import com.marklogic.hub.flow.CodeFormat
-import com.marklogic.hub.flow.DataFormat
-import com.marklogic.hub.flow.FlowType
+import com.marklogic.hub.FlowManager
+import com.marklogic.hub.flow.Flow
 import com.marklogic.hub.scaffold.Scaffolding
-import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.TaskAction
 
-abstract class CreateFlowTask extends HubTask {
+class CreateFlowTask extends HubTask {
 
-    @Input
-    public Boolean useES
+    @TaskAction
+    void createFlow() {
+        def propName = "flowName"
+        def propEmptySteps = "emptySteps"
 
-
-    void createFlow(FlowType flowType) {
-        def entityName = project.hasProperty("entityName") ? project.property("entityName") : null
-        if (entityName == null) {
-            throw new EntityNameRequiredException()
-        }
-        def flowName = project.hasProperty("flowName") ? project.property("flowName") : null
+        def flowName = project.hasProperty(propName) ? project.property(propName) : null
         if (flowName == null) {
             throw new FlowNameRequiredException()
         }
 
-        def pluginFormat = project.hasProperty("pluginFormat") ?
-            CodeFormat.getCodeFormat(project.property("pluginFormat")) : CodeFormat.JAVASCRIPT
+        def emptySteps = project.hasProperty(propEmptySteps) ? Boolean.parseBoolean(project.property(propEmptySteps) as String) : false
 
-        def dataFormatStr = project.hasProperty("dataFormat") ?
-            project.property("dataFormat") : "json"
+        FlowManager flowManager = getFlowManager()
+        if (flowManager.getFlow(flowName.toString()) == null) {
+            if (emptySteps) {
+                Flow flow = flowManager.createFlow(flowName.toString())
+                flowManager.saveFlow(flow)
+            }
+            else {
+                Scaffolding scaffolding = getScaffolding()
+                scaffolding.createDefaultFlow(flowName.toString())
 
-        def dataFormat
-        switch(dataFormatStr) {
-            case "json":
-                dataFormat = DataFormat.JSON
-            break
-            case "xml":
-                dataFormat = DataFormat.XML
-            break
-            default:
-                println "invalid dataFormat: " + dataFormatStr
-                return
+                println "IMPORTANT: Your new flow configuration file \"flows/" + flowName + ".flow.json\" contains step templates with " +
+                    "example values, such as 'inputFilePath' and 'entity-name'. The flow will not run as is. " +
+                    "You MUST customize the steps for your project before running the flow."
+            }
         }
-
-        if (useES == null) {
-            useES = project.hasProperty("useES") ?
-                Boolean.parseBoolean(project.property("useES")) : false
+        else {
+            throw new FlowAlreadyPresentException()
         }
-
-        def projectDir = getHubConfig().projectDir
-        Scaffolding scaffolding = new Scaffolding(projectDir, getFinalClient())
-        println "Creating an " + pluginFormat + " " + flowType + " flow named " + flowName + " for entity " + entityName
-        scaffolding.createFlow(entityName, flowName, flowType, pluginFormat, dataFormat, useES)
     }
 }

@@ -1,3 +1,18 @@
+/*
+ * Copyright 2012-2019 MarkLogic Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.marklogic.hub.util;
 
 import com.marklogic.client.ext.helper.LoggingObject;
@@ -103,8 +118,8 @@ public class HubModuleManager extends LoggingObject implements ModulesManager {
      * you get "c:". This of course will be a problem if you for some reason have modules with the same names but
      * differing in some cases, but I'm not sure why anyone would do that.
      *
-     * @param file
-     * @return
+     * @param file - the file to build a key for
+     * @return a key
      */
     protected String buildKey(File file) {
         return file.getAbsolutePath().toLowerCase();

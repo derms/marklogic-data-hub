@@ -1,22 +1,35 @@
+/*
+ * Copyright 2012-2019 MarkLogic Corporation
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ */
+
 package com.marklogic.gradle.task
 
-import com.marklogic.client.DatabaseClient
-import com.marklogic.client.datamovement.JobTicket
-import com.marklogic.client.io.JacksonHandle
-import com.marklogic.gradle.exception.EntityNameRequiredException
+import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.marklogic.gradle.exception.FlowNameRequiredException
 import com.marklogic.gradle.exception.FlowNotFoundException
 import com.marklogic.gradle.exception.HubNotInstalledException
 import com.marklogic.hub.FlowManager
-import com.marklogic.hub.flow.*
+import com.marklogic.hub.flow.Flow
+import com.marklogic.hub.flow.RunFlowResponse
+import groovy.json.JsonBuilder
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.TaskAction
-import org.gradle.api.tasks.TaskExecutionException
 
 class RunFlowTask extends HubTask {
-
-    @Input
-    public String entityName
 
     @Input
     public String flowName
@@ -28,10 +41,16 @@ class RunFlowTask extends HubTask {
     public Integer threadCount
 
     @Input
-    public String sourceDB
+    public String inputFilePath
+    
+    @Input
+    public String inputFileType
+    
+    @Input
+    public String outputURIReplacement
 
     @Input
-    public String destDB
+    public String separator
 
     @Input
     public Boolean showOptions
@@ -39,50 +58,75 @@ class RunFlowTask extends HubTask {
     @Input
     public Boolean failHard
 
+    @Input
+    public List<String> steps
+
+    @Input
+    public String jobId
+
     @TaskAction
     void runFlow() {
-        if (entityName == null) {
-            entityName = project.hasProperty("entityName") ? project.property("entityName") : null
-        }
-        if (entityName == null) {
-            throw new EntityNameRequiredException()
-        }
+
         if (flowName == null) {
             flowName = project.hasProperty("flowName") ? project.property("flowName") : null
         }
         if (flowName == null) {
             throw new FlowNameRequiredException()
         }
-        if (batchSize == null) {
-            batchSize = project.hasProperty("batchSize") ?
-                Integer.parseInt(project.property("batchSize")) : 100
-        }
-        if (threadCount == null) {
-            threadCount = project.hasProperty("threadCount") ?
-                Integer.parseInt(project.property("threadCount")) : 4
+
+        def runFlowString = new StringBuffer("Running Flow: [" + flowName + "]")
+
+        if (jobId == null) {
+            jobId = project.hasProperty("jobId") ? project.property("jobId") : null
         }
 
-        DatabaseClient sourceClient = null
-        if (sourceDB != null) {
-            sourceClient = hubConfig.newStagingClient(project.property("sourceDB"))
+        if (batchSize == null) {
+            batchSize = project.hasProperty("batchSize") ?
+                Integer.parseInt(project.property("batchSize")) : null
         }
-        else if (project.hasProperty("sourceDB")) {
-            sourceClient = hubConfig.newStagingClient(project.property("sourceDB"))
+
+        if (threadCount == null) {
+            threadCount = project.hasProperty("threadCount") ?
+                Integer.parseInt(project.property("threadCount")) : null
         }
-        else {
-            sourceClient = hubConfig.newStagingClient()
+
+        if (inputFilePath == null) {
+            inputFilePath = project.hasProperty("inputFilePath") ?
+                project.property("inputFilePath") : null
         }
-        if (destDB == null) {
-            destDB = project.hasProperty("destDB") ?
-                project.property("destDB") : hubConfig.finalDbName
+
+        if (inputFileType == null) {
+            inputFileType = project.hasProperty("inputFileType") ?
+                project.property("inputFileType") : null
         }
+
+        if (separator == null) {
+            separator = project.hasProperty("separator") ?
+                project.property("separator") : null
+        }
+
+        if (outputURIReplacement == null) {
+            outputURIReplacement = project.hasProperty("outputURIReplacement") ?
+                project.property("outputURIReplacement") : null
+        }
+
         if (showOptions == null) {
             showOptions = project.hasProperty("showOptions") ?
                 Boolean.parseBoolean(project.property("showOptions")) : false
         }
+
         if (failHard == null) {
             failHard = project.hasProperty("failHard") ?
                 Boolean.parseBoolean(project.property("failHard")) : false
+        }
+
+        if (steps == null) {
+            steps = project.hasProperty("steps") ?
+                project.property("steps").toString().trim().tokenize(",") : null
+        }
+
+        if(steps != null) {
+            runFlowString.append(", Steps: [" + steps.join(",") + "]")
         }
 
         if (!isHubInstalled()) {
@@ -90,71 +134,82 @@ class RunFlowTask extends HubTask {
         }
 
         FlowManager fm = getFlowManager()
-        Flow flow = fm.getFlow(entityName, flowName, FlowType.HARMONIZE)
+        Flow flow = fm.getFlow(flowName)
         if (flow == null) {
-            throw new FlowNotFoundException(entityName, flowName);
+            throw new FlowNotFoundException(flowName)
         }
 
         Map<String, Object> options = new HashMap<>()
-        project.ext.properties.each { key, value ->
-            if (key.toString().startsWith("dhf.")) {
-                options.put(key, value)
-            }
+        def optionsString;
+        if(project.ext.properties.containsKey("optionsFile")){
+            def jsonFile = new File(project.ext.optionsFile.trim())
+            optionsString = jsonFile.text
         }
-        println("Running Flow: [" + entityName + ":" + flowName + "]" +
-            "\n\twith batch size: " + batchSize +
-            "\n\twith thread count: " + threadCount +
-            "\n\twith Source DB: " + sourceClient.database +
-            "\n\twith Destination DB: " + destDB.toString())
+        else if(project.ext.properties.containsKey("options")) {
+            optionsString = String.valueOf(project.ext.options)
+        }
+        if (optionsString?.trim()) {
+            ObjectMapper mapper = new ObjectMapper();
+            options = mapper.readValue(optionsString,
+                new TypeReference<Map<String, Object>>() {
+                });
+        }
 
+        Map<String, Object> stepConfig = new HashMap<>()
+
+        if(batchSize != null){
+            runFlowString.append("\n\twith batch size: " + batchSize)
+            stepConfig.put("batchSize", batchSize)
+        }
+        if(threadCount != null){
+            runFlowString.append("\n\twith thread count: " + threadCount)
+            stepConfig.put("threadCount", threadCount)
+        }
+        if(Boolean.TRUE.equals(failHard)) {
+            runFlowString.append("\n\t\twith fail hard:" + failHard.toString())
+            stepConfig.put("stopOnFailure", failHard)
+        }
+
+        if(inputFileType != null || inputFilePath != null || outputURIReplacement != null || separator !=null){
+            runFlowString.append("\n\tWith File Locations Settings:")
+            Map<String, String> fileLocations = new HashMap<>()
+            if(inputFileType != null) {
+                runFlowString.append("\n\t\tInput File Type:" + inputFileType.toString())
+                fileLocations.put("inputFileType", inputFileType)
+            }
+            if(inputFilePath != null) {
+                runFlowString.append("\n\t\tInput File Path:" + inputFilePath.toString())
+                fileLocations.put("inputFilePath", inputFilePath)
+            }
+            if(outputURIReplacement != null) {
+                runFlowString.append("\n\t\tOutput URI Replacement:" + outputURIReplacement.toString())
+                fileLocations.put("outputURIReplacement", outputURIReplacement)
+            }
+            if(separator != null) {
+                if(inputFileType != null && !inputFileType.equalsIgnoreCase("csv")) {
+                    throw new IllegalArgumentException("Invalid argument for file type " + inputFileType + ". When specifying a separator, the file type must be 'csv'")
+                }
+                runFlowString.append("\n\t\tSeparator:" + separator.toString())
+                fileLocations.put("separator", separator)
+            }
+
+            stepConfig.put("fileLocations", fileLocations)
+        }
         if (showOptions) {
-            println("\tand options:")
+            runFlowString.append("\n\tand options:")
             options.each { key, value ->
-                println("\t\t" + key + " = " + value)
+                runFlowString.append("\n\t\t" + key + " = " + value)
             }
         }
 
-        Vector<String> completed = new Vector<>()
-        Vector<String> failed = new Vector<>()
-        FlowRunner flowRunner = fm.newFlowRunner()
-            .withFlow(flow)
-            .withOptions(options)
-            .withBatchSize(batchSize)
-            .withThreadCount(threadCount)
-            .withSourceClient(sourceClient)
-            .withDestinationDatabase(destDB)
-            .onItemComplete(new FlowItemCompleteListener() {
-                @Override
-                void processCompletion(String jobId, String itemId) {
-                    completed.add(itemId)
-                }
-            })
-            .onItemFailed(new FlowItemFailureListener() {
-                @Override
-                void processFailure(String jobId, String itemId) {
-                    failed.add(itemId)
-                }
-            })
-        JobTicket jobTicket = flowRunner.run()
-        flowRunner.awaitCompletion()
+        // now we print out the string buffer
+        println(runFlowString.toString())
 
-        def jobDocMgr = getHubConfig().newJobDbClient().newDocumentManager()
-        def job = jobDocMgr.read("/jobs/" + jobTicket.getJobId() + ".json").next().getContent(new JacksonHandle()).get();
-        def jobOutput = job.get("jobOutput")
-        if (jobOutput != null && jobOutput.size() > 0) {
-            def output = prettyPrint(jobOutput.get(0).asText())
-            if (failHard) {
-                throw new TaskExecutionException(this, new Throwable(output))
-            }
-            else {
-                println("\n\nERROR Output:")
-                println(output)
-            }
+        RunFlowResponse runFlowResponse = dataHub.getFlowRunner().runFlow(flow.getName(), steps, jobId, options, stepConfig)
+        dataHub.getFlowRunner().awaitCompletion()
 
-        }
-        else {
-            println("\n\nOutput:")
-            println(prettyPrint(job))
-        }
+        JsonBuilder jobResp = new JsonBuilder(runFlowResponse)
+        println("\n\nOutput:")
+        println(jobResp.toPrettyString())
     }
 }

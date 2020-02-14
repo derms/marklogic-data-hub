@@ -1,0 +1,13 @@
+{
+  "lang" : "zxx",
+  "name" : "my-new-mapping",
+  "description" : "This is a test.",
+  "version" : 1,
+  "targetEntityType" : "http://marklogic.com/Employee-0.0.1/Employee",
+  "sourceContext" : "/",
+  "properties" : {
+    "name" : {
+      "sourcedFrom" : "name"
+    }
+  }
+}

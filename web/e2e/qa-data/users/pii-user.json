@@ -1,0 +1,6 @@
+{
+  "user-name": "pii-user",
+  "description": "A user that can read pii property",
+  "password": "x",
+  "role": ["flow-developer-role", "flow-operator-role", "pii-reader"]
+}

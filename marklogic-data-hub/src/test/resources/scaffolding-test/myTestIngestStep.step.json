@@ -1,0 +1,13 @@
+{
+  "name": "myTestIngestStep",
+  "type": "INGESTION",
+  "version": 1,
+  "options": {
+    "collections": ["myTestIngestStep"],
+    "outputFormat": "json"
+  },
+  "customHook" : { },
+  "lang" : "zxx",
+  "modulePath" : "/path/to/your/step/module/main.sjs",
+  "identifier" : null
+}

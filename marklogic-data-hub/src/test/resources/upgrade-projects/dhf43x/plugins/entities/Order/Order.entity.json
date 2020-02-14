@@ -1,0 +1,17 @@
+{
+  "info" : {
+    "title" : "Order",
+    "version" : "0.0.1",
+    "baseUri": "http://www.marklogic.com/"
+  },
+  "definitions" : {
+    "Order" : {
+      "required" : [ ],
+      "pii" : [ ],
+      "elementRangeIndex" : [ ],
+      "rangeIndex" : [ ],
+      "wordLexicon" : [ ],
+      "properties" : { }
+    }
+  }
+}

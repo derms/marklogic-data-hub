@@ -1,3 +1,20 @@
+/*
+ * Copyright 2012-2019 MarkLogic Corporation
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ */
+
 package com.marklogic.gradle.task
 
 import com.fasterxml.jackson.databind.JsonNode
@@ -5,7 +22,16 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.marklogic.appdeployer.command.CommandContext
 import com.marklogic.client.DatabaseClient
 import com.marklogic.hub.*
-import com.marklogic.hub.job.JobManager
+import com.marklogic.hub.deploy.commands.GeneratePiiCommand
+import com.marklogic.hub.deploy.commands.LoadHubArtifactsCommand
+import com.marklogic.hub.deploy.commands.LoadHubModulesCommand
+import com.marklogic.hub.deploy.commands.LoadUserArtifactsCommand
+import com.marklogic.hub.deploy.commands.LoadUserModulesCommand
+import com.marklogic.hub.legacy.LegacyDebugging
+import com.marklogic.hub.legacy.LegacyFlowManager
+import com.marklogic.hub.legacy.LegacyTracing
+import com.marklogic.hub.legacy.job.LegacyJobManager
+import com.marklogic.hub.scaffold.Scaffolding
 import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.Internal
 
@@ -17,28 +43,88 @@ abstract class HubTask extends DefaultTask {
     }
 
     @Internal
+    HubProject getHubProject() {
+        getProject().property("hubProject")
+    }
+
+    @Internal
     DataHub getDataHub() {
         getProject().property("dataHub")
     }
 
     @Internal
-    Tracing getTracing() {
-        return new Tracing(getStagingClient())
+    Scaffolding getScaffolding() {
+        getProject().property("scaffolding")
     }
 
     @Internal
-    Debugging getDebugging() {
-        return new Debugging(getStagingClient())
+    LoadHubModulesCommand getLoadHubModulesCommand() {
+        getProject().property("loadHubModulesCommand")
+    }
+
+    @Internal
+    LoadHubArtifactsCommand getLoadHubArtifactsCommand() {
+        getProject().property("loadHubArtifactsCommand")
+    }
+
+    @Internal
+    LoadUserModulesCommand getLoadUserModulesCommand() {
+        getProject().property("loadUserModulesCommand")
+    }
+
+    @Internal
+    LoadUserArtifactsCommand getLoadUserArtifactsCommand() {
+        getProject().property("loadUserArtifactsCommand")
+    }
+
+    @Internal
+    MappingManager getMappingManager() {
+        getProject().property("mappingManager")
+    }
+
+    @Internal
+    MasteringManager getMasteringManager() {
+        getProject().property("masteringManager")
+    }
+
+    @Internal
+    StepDefinitionManager getStepDefinitionManager() {
+        getProject().property("stepManager")
+    }
+
+    @Internal
+    EntityManager getEntityManager() {
+        getProject().property("entityManager")
+    }
+
+    @Internal
+    GeneratePiiCommand getGeneratePiiCommand() {
+        getProject().property("generatePiiCommand")
+    }
+
+    @Internal
+    LegacyTracing getLegacyTracing() {
+        return LegacyTracing.create(getStagingClient())
+    }
+
+    @Internal
+    LegacyDebugging getLegacyDebugging() {
+        return LegacyDebugging.create(getStagingClient())
     }
 
     @Internal
     FlowManager getFlowManager() {
-        return new FlowManager(getHubConfig())
+        getProject().property("flowManager")
     }
 
     @Internal
-    JobManager getJobManager() {
-        return new JobManager(getHubConfig().newJobDbClient());
+    LegacyFlowManager getLegacyFlowManager() {
+        getProject().property("legacyFlowManager")
+    }
+
+    @Internal
+    LegacyJobManager getJobManager() {
+        return LegacyJobManager.create(getHubConfig().newJobDbClient());
     }
 
     @Internal
@@ -47,8 +133,9 @@ abstract class HubTask extends DefaultTask {
     }
 
     @Internal
+    // all the groovy tasks that getFinalClient actually need the DHF modules.
     DatabaseClient getFinalClient() {
-        return getHubConfig().newFinalClient()
+        return getHubConfig().newReverseFlowClient()
     }
 
     @Internal
@@ -69,15 +156,14 @@ abstract class HubTask extends DefaultTask {
             ObjectMapper mapper = new ObjectMapper()
             if (str instanceof JsonNode) {
                 jsonObject = str
-            }
-            else {
+            } else {
                 jsonObject = mapper.readValue(str, Object.class)
             }
             return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(jsonObject)
         }
-        catch(Exception e) {
+        catch (Exception e) {
             return str
         }
-
     }
+
 }

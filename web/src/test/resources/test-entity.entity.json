@@ -1,0 +1,17 @@
+{
+  "info" : {
+    "title" : "test-entity",
+    "version" : "0.0.1",
+    "baseUri": "http://www.marklogic.com/"
+  },
+  "definitions" : {
+    "test-entity" : {
+      "required" : [ ],
+      "rangeIndex" : [ ],
+      "wordLexicon" : [ ],
+      "pii" : [ ],
+      "properties" : {
+      }
+    }
+  }
+}

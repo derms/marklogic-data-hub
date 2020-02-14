@@ -1,41 +1,112 @@
 package com.marklogic.hub.flow;
 
-import com.marklogic.client.DatabaseClient;
-import com.marklogic.client.datamovement.JobTicket;
-import com.marklogic.hub.HubDatabase;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public interface FlowRunner {
 
-    FlowRunner withFlow(Flow flow);
-    FlowRunner withBatchSize(int batchSize);
-    FlowRunner withThreadCount(int threadCount);
-    FlowRunner withSourceClient(DatabaseClient sourceClient);
-    FlowRunner withDestinationDatabase(String destinationDatabase);
-    FlowRunner withOptions(Map<String, Object> options);
-
-    FlowRunner onItemComplete(FlowItemCompleteListener listener);
-    FlowRunner onItemFailed(FlowItemFailureListener listener);
-
-    FlowRunner onStatusChanged(FlowStatusListener listener);
-    FlowRunner onFinished(FlowFinishedListener listener);
 
     /**
-     * Blocks until the job is complete.
+     * Runs the flow, with a specific set of steps, with all custom settings
+     *
+     * @param flow the flow to run
+     * @param jobId the jobid to be used for the flow
+     * @return a response object
+     */
+    RunFlowResponse runFlow(String flow, String jobId);
+
+    /**
+     * Runs the flow, with a specific set of steps, with all custom settings
+     *
+     * @param flow the flow to run
+     * @param steps the steps in the flow to run
+     * @param jobId the jobid to be used for the flow
+     * @return a response object
+     */
+    RunFlowResponse runFlow(String flow, List<String> steps, String jobId);
+
+    /**
+     * Runs the flow, with a specific set of steps, with all custom settings
+     *
+     * @param flow the flow to run
+     * @param jobId the jobid to be used for the flow
+     * @param options the key/value options to be passed
+     * @return a response object
+     */
+    RunFlowResponse runFlow(String flow, String jobId, Map<String, Object> options);
+
+    /**
+     * Runs the flow, with a specific set of steps, with all custom settings
+     *
+     * @param flow the flow to run
+     * @param steps the steps in the flow to run
+     * @param jobId the jobid to be used for the flow
+     * @param options the key/value options to be passed
+     * @return a response object
+     */
+    RunFlowResponse runFlow(String flow, List<String> steps, String jobId, Map<String, Object> options);
+
+    /**
+     * Runs the flow, with a specific set of steps, with all custom settings
+     *
+     * @param flow the flow to run
+     * @param steps the steps in the flow to run
+     * @param jobId the jobid to be used for the flow
+     * @param options the key/value options to be passed
+     * @param stepConfig the key/value config to override the running of the step
+     * @return a response object
+     */
+    RunFlowResponse runFlow(String flow, List<String> steps, String jobId, Map<String, Object> options, Map<String, Object> stepConfig);
+
+    /**
+     * Runs the flow, with a specific set of steps, with all defaults from step
+     *
+     * @param flow the flow to run
+     * @param steps the steps in the flow to run
+     * @return a response object
+     */
+    RunFlowResponse runFlow(String flow, List<String> steps);
+
+    /**
+     * Runs the entire flow, with full defaults
+     *
+     * @param flow the flow to run
+     * @return a response object
+     */
+    RunFlowResponse runFlow(String flow);
+
+    /**
+     * Runs the flow.
+     *
+     * @param jobId the id of the running flow
+     *
+     */
+    void stopJob(String jobId);
+
+    /**
+     * Blocks until the flow execution is complete.
      */
     void awaitCompletion();
 
     /**
-     * Blocks until the job is complete.
+     * Blocks until the flow execution is complete.
      *
      * @param timeout the maximum time to wait
      * @param unit the time unit of the timeout argument
      *
      * @throws InterruptedException if interrupted while waiting
+     * @throws TimeoutException if times out
      */
-    void awaitCompletion(long timeout, TimeUnit unit) throws InterruptedException;
+    void awaitCompletion(long timeout, TimeUnit unit) throws InterruptedException, TimeoutException;
 
-    JobTicket run();
+    /**
+     * Sets the status change listener on the flowrunner object
+     * @param listener - the listener for when the status changes
+     * @return the flow runner object
+     */
+    FlowRunner onStatusChanged(FlowStatusListener listener);
+
 }

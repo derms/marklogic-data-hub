@@ -1,4 +1,4 @@
-const dhf = require('/com.marklogic.hub/dhf.xqy');
+const dhf = require('/data-hub/4/dhf.sjs');
 
 const contentPlugin = require('./content/content.sjs');
 const headersPlugin = require('./headers/headers.sjs');

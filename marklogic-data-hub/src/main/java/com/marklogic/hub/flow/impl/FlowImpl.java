@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2016 MarkLogic Corporation
+ * Copyright 2012-2019 MarkLogic Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,287 +15,168 @@
  */
 package com.marklogic.hub.flow.impl;
 
-import com.marklogic.client.MarkLogicIOException;
-import com.marklogic.hub.collector.Collector;
-import com.marklogic.hub.collector.impl.CollectorImpl;
-import com.marklogic.hub.flow.*;
-import com.marklogic.hub.main.MainPlugin;
-import com.marklogic.hub.main.impl.MainPluginImpl;
-import org.w3c.dom.Document;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.SAXException;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.marklogic.hub.flow.Flow;
+import com.marklogic.hub.step.impl.Step;
+import com.marklogic.hub.util.json.JSONObject;
+import org.apache.commons.lang3.StringUtils;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.stream.XMLOutputFactory;
-import javax.xml.stream.XMLStreamWriter;
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.stream.StreamResult;
-import javax.xml.transform.stream.StreamSource;
-import java.io.*;
-import java.util.Properties;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class FlowImpl implements Flow {
+    public final static int DEFAULT_BATCH_SIZE = 100;
+    public final static int DEFAULT_THREAD_COUNT = 4;
+    public final static boolean DEFAULT_STOP_ONERROR = false;
 
-    private String entityName;
     private String name;
-    private FlowType type;
-    private DataFormat dataFormat;
-    private CodeFormat codeFormat;
-    private Collector collector;
-    private MainPlugin main;
+    private String description;
+    private int batchSize;
+    private int threadCount;
+    private boolean stopOnError;
+    private JsonNode options;
+    private int version;
 
-    public FlowImpl() {}
+    private Map<String, Step> steps = new LinkedHashMap<>();
 
-    @Override
-    public void setEntityName(String entityName) {
-        this.entityName = entityName;
+    @JsonIgnore
+    private Map<String, Object> overrideOptions;
+    @JsonIgnore
+    private Map<String, Object> overrideStepConfig;
+
+
+    public Map<String, Object> getOverrideStepConfig() {
+        return this.overrideStepConfig;
     }
 
-    @Override
-    public String getEntityName() {
-        return entityName;
+    public void setOverrideStepConfig(Map<String, Object> overrideStepConfig) {
+        this.overrideStepConfig = overrideStepConfig;
     }
 
-    @Override
-    public void setName(String name) {
-        this.name = name;
+
+    public void setOverrideOptions(Map<String, Object> overrideOptions) {
+        this.overrideOptions = overrideOptions;
+    }
+    
+    public Map<String, Object> getOverrideOptions() {
+        return this.overrideOptions;
     }
 
-    @Override
+
     public String getName() {
-        return name;
+        return this.name;
+    }
+
+    public void setName(String flowName) {
+        this.name = flowName;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     @Override
-    public void setType(FlowType type) {
-        this.type = type;
+    public int getBatchSize() {
+        return batchSize;
     }
 
     @Override
-    public FlowType getType() {
-        return type;
+    public void setBatchSize(int batchSize) {
+        this.batchSize = batchSize;
     }
 
     @Override
-    public void setDataFormat(DataFormat dataFormat) {
-        this.dataFormat = dataFormat;
+    public int getThreadCount() {
+        return threadCount;
     }
 
     @Override
-    public DataFormat getDataFormat() {
-        return dataFormat;
+    public void setThreadCount(int threadCount) {
+        this.threadCount = threadCount;
     }
 
     @Override
-    public void setCodeFormat(CodeFormat codeFormat) {
-        this.codeFormat = codeFormat;
+    public JsonNode getOptions() {
+        return this.options;
     }
 
     @Override
-    public CodeFormat getCodeFormat() {
-        return codeFormat;
+    public void setOptions(JsonNode options) {
+        this.options = options;
     }
 
     @Override
-    public Collector getCollector() {
-        return collector;
+    public Map<String, Step> getSteps() {
+        return steps;
     }
 
     @Override
-    public void setCollector(Collector collector) {
-        this.collector = collector;
+    public void setSteps(Map<String, Step> steps) {
+        this.steps = steps;
     }
 
     @Override
-    public MainPlugin getMain() {
-        return main;
+    public Step getStep(String stepKey) {
+        return steps.get(stepKey);
     }
 
     @Override
-    public void setMain(MainPlugin main) {
-        this.main = main;
+    public void setStopOnError(boolean stopOnError) {
+        this.stopOnError = stopOnError;
     }
 
-    private XMLStreamWriter makeXMLSerializer(StringWriter writer) {
-        XMLOutputFactory factory = XMLOutputFactory.newInstance();
-        factory.setProperty(XMLOutputFactory.IS_REPAIRING_NAMESPACES, true);
-        try {
-            return factory.createXMLStreamWriter(writer);
-        } catch (Exception e) {
-            throw new MarkLogicIOException(e);
-        }
-    }
-
-    /**
-     * Serializes the flow into an xml string
-     */
     @Override
-    public String serialize() {
-        try {
-            StringWriter writer = new StringWriter();
-            XMLStreamWriter serializer = makeXMLSerializer(writer);
-            serializer.writeStartDocument();
-            serializer.writeComment("This file is autogenerated. Please don't edit.");
-            serializer.setDefaultNamespace("http://marklogic.com/data-hub");
-            serializer.writeStartElement("flow");
+    public boolean isStopOnError() {
+        return stopOnError;
+    }
 
-            serializer.writeStartElement("name");
-            serializer.writeCharacters(this.name);
-            serializer.writeEndElement();
+    @Override
+    public int getVersion() {
+        return this.version;
+    }
 
-            serializer.writeStartElement("entity");
-            serializer.writeCharacters(this.entityName);
-            serializer.writeEndElement();
+    @Override
+    public void setVersion(int version) {
+        this.version = version;
+    }
 
-            serializer.writeStartElement("type");
-            serializer.writeCharacters(this.type.toString());
-            serializer.writeEndElement();
+    @Override
+    public Flow deserialize(JsonNode json) {
+        JSONObject jsonObject = new JSONObject(json);
+        setName(jsonObject.getString("name"));
+        setDescription(jsonObject.getString("description"));
+        setBatchSize(jsonObject.getInt("batchSize", DEFAULT_BATCH_SIZE));
+        setThreadCount(jsonObject.getInt("threadCount", DEFAULT_THREAD_COUNT));
+        setOptions(jsonObject.getNode("options"));
+        setStopOnError(jsonObject.getBoolean("stopOnError", DEFAULT_STOP_ONERROR));
 
-            serializer.writeStartElement("data-format");
-            serializer.writeCharacters(this.dataFormat.toString());
-            serializer.writeEndElement();
-
-            serializer.writeStartElement("code-format");
-            serializer.writeCharacters(this.codeFormat.toString());
-            serializer.writeEndElement();
-
-            String flowDir = "/entities/" + getEntityName() + "/" + getType().toString() + "/" + getName() + "/";
-            if (this.collector != null) {
-                serializer.writeStartElement("collector");
-                serializer.writeAttribute("code-format", collector.getCodeFormat().toString());
-                serializer.writeAttribute("module", flowDir + collector.getModule());
-                serializer.writeEndElement();
+        JsonNode stepNode =jsonObject.getNode("steps");
+        if (stepNode != null) {
+            Iterator<String> iterator = stepNode.fieldNames();
+            while (iterator.hasNext()) {
+                String key = iterator.next();
+                Step step = Step.deserialize(stepNode.get(key));
+                steps.put(key, step);
             }
 
-            if (this.main != null) {
-                serializer.writeStartElement("main");
-                serializer.writeAttribute("code-format", main.getCodeFormat().toString());
-                serializer.writeAttribute("module", flowDir + main.getModule());
-                serializer.writeEndElement();
-            }
-
-            serializer.writeEndElement();
-            serializer.writeEndDocument();
-            serializer.flush();
-            serializer.close();
-
-            StringWriter finalWriter = new StringWriter();
-
-            Transformer t = TransformerFactory.newInstance().newTransformer();
-            t.setOutputProperty(OutputKeys.INDENT, "yes");
-            t.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
-            t.transform(new StreamSource(new StringReader(writer.toString())), new StreamResult(finalWriter));
-
-            return finalWriter.toString().replaceFirst("<!--", "\n<!--").replaceFirst("-->", "-->\n");
+            setSteps(steps);
         }
-        catch(Exception e) {
-            throw new MarkLogicIOException(e);
-        }
+
+        return this;
     }
 
     @Override
-    public Properties toProperties() {
-        Properties flowProperties = new Properties();
-        flowProperties.setProperty("dataFormat", dataFormat.toString());
-        flowProperties.setProperty("codeFormat", codeFormat.toString());
-        if (this.collector != null) {
-            flowProperties.setProperty("collectorCodeFormat", collector.getCodeFormat().toString());
-            flowProperties.setProperty("collectorModule", collector.getModule());
+    @Deprecated
+    public Step getStepById(String stepKey) {
+        if (StringUtils.isEmpty(stepKey)) {
+            return null;
         }
-
-        if (this.main != null) {
-            flowProperties.setProperty("mainCodeFormat", main.getCodeFormat().toString());
-            flowProperties.setProperty("mainModule", main.getModule());
-        }
-
-        return flowProperties;
+        return steps.get(stepKey);
     }
-
-    public static Flow loadFromFile(File file) {
-        Flow flow = null;
-        FileInputStream is = null;
-        try {
-            is = new FileInputStream(file);
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            factory.setNamespaceAware(true);
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(is);
-            flow = FlowImpl.fromXml(doc.getDocumentElement());
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (ParserConfigurationException e) {
-            e.printStackTrace();
-        } catch (SAXException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        finally {
-            if (is != null) {
-                try {
-                    is.close();
-                }
-                catch(IOException e) {}
-            }
-
-        }
-        return flow;
-    }
-
-
-    public static Flow fromXml(Node xml) {
-        FlowBuilder flowBuilder = FlowBuilder.newFlow();
-        NodeList children = xml.getChildNodes();
-        for (int i = 0; i < children.getLength(); i++) {
-            Node node = children.item(i);
-            if (node.getNodeType() != Node.ELEMENT_NODE) {
-                continue;
-            }
-
-            String nodeName = node.getLocalName();
-            switch(nodeName) {
-                case "name":
-                    flowBuilder.withName(node.getTextContent());
-                    break;
-                case "data-format":
-                    flowBuilder.withDataFormat(DataFormat.getDataFormat(node.getTextContent()));
-                    break;
-                case "code-format":
-                    flowBuilder.withCodeFormat(CodeFormat.getCodeFormat(node.getTextContent()));
-                    break;
-                case "type":
-                    flowBuilder.withType(FlowType.getFlowType(node.getTextContent()));
-                    break;
-                case "entity":
-                    flowBuilder.withEntityName(node.getTextContent());
-                    break;
-                case "collector":
-                    Collector collector = new CollectorImpl(
-                        node.getAttributes().getNamedItem("module").getNodeValue(),
-                        CodeFormat.getCodeFormat(node.getAttributes().getNamedItem("code-format").getNodeValue())
-                    );
-                    flowBuilder.withCollector(collector);
-                    break;
-                case "main":
-                    MainPlugin main = new MainPluginImpl(
-                        node.getAttributes().getNamedItem("module").getNodeValue(),
-                        CodeFormat.getCodeFormat(node.getAttributes().getNamedItem("code-format").getNodeValue())
-                    );
-                    flowBuilder.withMain(main);
-                    break;
-            }
-        }
-        return flowBuilder.build();
-    }
-
-    @Override
-    public String getFlowDbPath() {
-        return "/entities/" + getEntityName() + "/" + getType().toString() + "/" + getName() + "/" + getName() + ".xml";
-    }
-
 }

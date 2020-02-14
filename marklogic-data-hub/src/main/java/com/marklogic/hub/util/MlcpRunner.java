@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2016 MarkLogic Corporation
+ * Copyright 2012-2019 MarkLogic Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,37 +20,42 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.marklogic.client.DatabaseClient;
 import com.marklogic.contentpump.bean.MlcpBean;
 import com.marklogic.hub.HubConfig;
-import com.marklogic.hub.flow.Flow;
-import com.marklogic.hub.flow.FlowStatusListener;
-import com.marklogic.hub.job.Job;
-import com.marklogic.hub.job.JobManager;
-import com.marklogic.hub.job.JobStatus;
+import com.marklogic.hub.legacy.flow.LegacyFlow;
+import com.marklogic.hub.legacy.flow.LegacyFlowStatusListener;
+import com.marklogic.hub.legacy.job.Job;
+import com.marklogic.hub.legacy.job.LegacyJobManager;
+import com.marklogic.hub.legacy.job.JobStatus;
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 public class MlcpRunner extends ProcessRunner {
 
-    private JobManager jobManager;
-    private Flow flow;
+    private static Logger logger = LoggerFactory.getLogger(MlcpRunner.class);
+    private LegacyJobManager jobManager;
+    private LegacyFlow flow;
     private JsonNode mlcpOptions;
     private String jobId = UUID.randomUUID().toString();
     private AtomicLong successfulEvents = new AtomicLong(0);
     private AtomicLong failedEvents = new AtomicLong(0);
-    FlowStatusListener flowStatusListener;
+    LegacyFlowStatusListener flowStatusListener;
     private String mlcpPath;
     private String mainClass;
     private DatabaseClient databaseClient;
+    private String database = null;
 
-    public MlcpRunner(String mlcpPath, String mainClass, HubConfig hubConfig, Flow flow, DatabaseClient databaseClient, JsonNode mlcpOptions, FlowStatusListener statusListener) {
+    public MlcpRunner(String mlcpPath, String mainClass, HubConfig hubConfig, LegacyFlow flow, DatabaseClient databaseClient, JsonNode mlcpOptions, LegacyFlowStatusListener statusListener) {
         super();
 
         this.withHubconfig(hubConfig);
 
-        this.jobManager = new JobManager(hubConfig.newJobDbClient());
+        this.jobManager = LegacyJobManager.create(hubConfig.newJobDbClient());
         this.flowStatusListener = statusListener;
         this.flow = flow;
         this.mlcpOptions = mlcpOptions;
@@ -76,6 +81,9 @@ public class MlcpRunner extends ProcessRunner {
             MlcpBean bean = new ObjectMapper().readerFor(MlcpBean.class).readValue(mlcpOptions);
             bean.setHost(databaseClient.getHost());
             bean.setPort(databaseClient.getPort());
+            if (database != null) {
+                bean.setDatabase(database);
+            }
 
             // Assume that the HTTP credentials will work for mlcp
             bean.setUsername(hubConfig.getAppConfig().getAppServicesUsername());
@@ -84,7 +92,12 @@ public class MlcpRunner extends ProcessRunner {
             File file = new File(mlcpOptions.get("input_file_path").asText());
             String canonicalPath = file.getCanonicalPath();
             bean.setInput_file_path(canonicalPath);
-            bean.setTransform_param("\"" + bean.getTransform_param().replaceAll("\"", "") + ",job-id=" + jobId + "\"");
+            bean.setTransform_param("\"" + bean.getTransform_param() + ",job-id=" + jobId + "\"");
+            bean.setModules_root("/");
+
+            if (hubConfig.getIsHostLoadBalancer()) {
+                bean.setRestrict_hosts(true);
+            }
 
             buildCommand(bean);
 
@@ -170,6 +183,39 @@ public class MlcpRunner extends ProcessRunner {
                 File.separator + "java";
             String classpath = System.getProperty("java.class.path");
 
+            //logger.warn("Classpath before is: " + classpath);
+            // strip out non-essential entries to truncate classpath
+            List<String> classpathEntries = Arrays.asList(classpath.split(File.pathSeparator));
+            String filteredClasspathEntries = classpath;
+            int MAX_CLASSPATH_LENGTH = 10000;
+            // if classpath was not alrady shortened (say, by IDE) then strip to run mlcp
+            if (filteredClasspathEntries.length() > MAX_CLASSPATH_LENGTH)
+                filteredClasspathEntries = classpathEntries
+                            .stream()
+                            .filter(
+                                u -> (
+                                    u.contains(System.getProperty("user.dir")) ||
+                                    u.contains("jdk") ||
+                                    u.contains("jre") ||
+                                    u.contains("log") ||
+                                    u.contains("xml") ||
+                                    u.contains("json") ||
+                                    u.contains("jackson") ||
+                                    u.contains("xerces") ||
+                                    u.contains("slf") ||
+                                    u.contains("mlcp") ||
+                                    u.contains("xcc") ||
+                                    u.contains("xpp") ||
+                                    u.contains("protobuf") ||
+                                    u.contains("mapreduce") ||
+                                    u.contains("guava") ||
+                                    u.contains("apache") ||
+                                    u.contains("commons") ||
+                                    u.contains("hadoop"))
+                            ).collect(Collectors.joining(File.pathSeparator));
+
+            //logger.warn("Classpath filtered to: " + filteredClasspathEntries);
+
             File loggerFile = File.createTempFile("mlcp-", "-logger.xml");
             FileUtils.writeStringToFile(loggerFile, buildLoggerconfig());
 
@@ -182,7 +228,7 @@ public class MlcpRunner extends ProcessRunner {
             }
             else {
                 args.add("-cp");
-                args.add(classpath);
+                args.add(filteredClasspathEntries);
                 args.add(mainClass);
             }
         }
@@ -193,5 +239,13 @@ public class MlcpRunner extends ProcessRunner {
 
         this.withStreamConsumer(new MlcpConsumer(successfulEvents,
             failedEvents, flowStatusListener, jobId));
+    }
+
+    /**
+     * Set the database context for the MlCP Client
+     * @param database the database name to use
+     */
+    public void setDatabase(String database) {
+        this.database = database;
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2016 MarkLogic Corporation
+ * Copyright 2012-2019 MarkLogic Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,8 @@
  */
 package com.marklogic.hub.main.impl;
 
-import com.marklogic.hub.flow.CodeFormat;
+import com.marklogic.hub.legacy.flow.CodeFormat;
 import com.marklogic.hub.main.MainPlugin;
-
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamWriter;
-import java.util.Properties;
 
 public class MainPluginImpl implements MainPlugin {
 

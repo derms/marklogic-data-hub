@@ -1,240 +1,272 @@
+/*
+ * Copyright 2012-2019 MarkLogic Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.marklogic.hub;
 
-import com.marklogic.hub.util.FileUtil;
-import org.apache.commons.io.IOUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.marklogic.hub.step.StepDefinition;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.PosixFilePermission;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 /**
- * Class for creating a hub Project
+ * Creates and gathers information about a hub project.
+ *
+ * This handles what is initially created on disk for the project.
  */
-public class HubProject {
+public interface HubProject {
+    String PATH_PREFIX = "src/main/";
+    String HUB_CONFIG_DIR = PATH_PREFIX + "hub-internal-config";
+    String USER_CONFIG_DIR = PATH_PREFIX + "ml-config";
 
-    public static final String HUB_CONFIG_DIR = "hub-internal-config";
-    public static final String USER_CONFIG_DIR = "user-config";
-    public static final String ENTITY_CONFIG_DIR = "entity-config";
-
-    private Path projectDir;
-    private Path pluginsDir;
-
-    protected final Logger logger = LoggerFactory.getLogger(this.getClass());
-
-    public HubProject(String projectDirStr) {
-        this.projectDir = Paths.get(projectDirStr).toAbsolutePath();
-        this.pluginsDir = this.projectDir.resolve("plugins");
-    }
-
-    public Path getHubPluginsDir() {
-        return this.pluginsDir;
-    }
-
-    public Path getHubEntitiesDir() {
-        return this.pluginsDir.resolve("entities");
-    }
-
-    public Path getHubConfigDir() {
-        return this.projectDir.resolve(HUB_CONFIG_DIR);
-    }
-
-    public Path getHubDatabaseDir() {
-        return getHubConfigDir().resolve("databases");
-    }
-
-    public Path getHubServersDir() {
-        return getHubConfigDir().resolve("servers");
-    }
-
-    public Path getHubSecurityDir() {
-        return getHubConfigDir().resolve("security");
-    }
-
-    public Path getHubMimetypesDir() {
-        return getHubConfigDir().resolve("mimetypes");
-    }
-
-    public Path getUserConfigDir() {
-        return this.projectDir.resolve(USER_CONFIG_DIR);
-    }
-
-    public Path getUserSecurityDir() {
-        return getUserConfigDir().resolve("security");
-    }
-
-    public Path getUserDatabaseDir() {
-        return getUserConfigDir().resolve("databases");
-    }
-
-    public Path getUserSchemasDir() {
-        return getUserConfigDir().resolve("schemas");
-    }
-
-    public Path getUserServersDir() {
-        return getUserConfigDir().resolve("servers");
-    }
-
-    public Path getEntityConfigDir() {
-        return this.projectDir.resolve(ENTITY_CONFIG_DIR);
-    }
-
-    public Path getEntityDatabaseDir() {
-        return getEntityConfigDir().resolve("databases");
-    }
+    /**
+     * Gets the string used to originally make the project
+     *
+     * @return The directory string.
+     */
+    String getProjectDirString();
 
 
+    /**
+     * Gets the path for the hub plugins directory
+     *
+     * @return the path for the hub plugins directory
+     */
+    Path getHubPluginsDir();
 
-    public boolean isInitialized() {
-        File buildGradle = this.projectDir.resolve("build.gradle").toFile();
-        File gradleProperties = this.projectDir.resolve("gradle.properties").toFile();
+    /**
+     * Gets the path for the hub step-definitions directory
+     *
+     * @return the path for the hub step-definitions directory
+     */
+    Path getStepDefinitionsDir();
 
-        File hubConfigDir = getHubConfigDir().toFile();
-        File userConfigDir = getUserConfigDir().toFile();
-        File databasesDir = getHubDatabaseDir().toFile();
-        File serversDir = getHubServersDir().toFile();
-        File securityDir = getHubSecurityDir().toFile();
+    /**
+     * Gets the path for the hub entities directory
+     *
+     * @return the path for the hub entities directory
+     */
+    Path getHubEntitiesDir();
 
-        boolean newConfigInitialized =
-            hubConfigDir.exists() &&
-                hubConfigDir.isDirectory() &&
-                userConfigDir.exists() &&
-                userConfigDir.isDirectory() &&
-                databasesDir.exists() &&
-                databasesDir.isDirectory() &&
-                serversDir.exists() &&
-                serversDir.isDirectory() &&
-                securityDir.exists() &&
-                securityDir.isDirectory();
+    /**
+     * Gets the legacy path for the hub entities directory
+     *
+     * @return the legacy path for the hub entities directory
+     */
+    Path getLegacyHubEntitiesDir();
 
-        return buildGradle.exists() &&
-            gradleProperties.exists() &&
-            newConfigInitialized;
-    }
+    /**
+     * Gets the path for the hub mappings directory
+     *
+     * @return the path for the hub mappings directory
+     */
+    Path getHubMappingsDir();
+
+    /**
+     * Gets the legacy path for the hub mappings directory
+     *
+     * @return the legacy path for the hub mappings directory
+     */
+    Path getLegacyHubMappingsDir();
+
+    /**
+     * Gets the path for the hub step directory by step type
+     *
+     * @param type - a Step type
+     * @return the path for the hub steps directory
+     */
+    Path getStepsDirByType(StepDefinition.StepDefinitionType type);
+
+    /**
+     * Gets the path for the hub's config directory
+     *
+     * @return the path for the hub's config directory
+     */
+    Path getHubConfigDir();
+
+    /**
+     * Gets the path for the hub's database directory
+     *
+     * @return the path for the hub's database directory
+     */
+    Path getHubDatabaseDir();
+
+    /**
+     * Gets the path for the hub servers directory
+     *
+     * @return the path for the hub servers database directory
+     */
+    Path getHubServersDir();
+
+    /**
+     * Gets the path for the hub's security directory
+     *
+     * @return the path for the hub's security directory
+     */
+    Path getHubSecurityDir();
+
+    /**
+     * Gets the path for the hub's triggers directory
+     *
+     * @return the path for the hub's triggers directory
+     */
+    Path getHubTriggersDir();
+
+    /**
+     * Gets the path for the user config directory
+     *
+     * @return the path for the user config directory
+     */
+    Path getUserConfigDir();
+
+    /**
+     * Gets the path for the user security directory
+     *
+     * @return the path for the user security directory
+     */
+    Path getUserSecurityDir();
+
+    /**
+     * Gets the path for the user database directory
+     *
+     * @return the path for the user database directory
+     */
+    Path getUserDatabaseDir();
+
+    /**
+     * Gets the path for the user schemas directory
+     *
+     * @return the path for the user schemas directory
+     */
+    Path getUserSchemasDir();
+
+    /**
+     * Gets the path for the user servers directory
+     *
+     * @return the path for the user servers database directory
+     */
+    Path getUserServersDir();
+
+    /**
+     * Gets the path for the entity's config directory
+     *
+     * @return the path for the entity's config directory
+     */
+    Path getEntityConfigDir();
+
+    /**
+     * Gets the path for the entity database directory
+     *
+     * @return the path for the entity's database directory
+     */
+    Path getEntityDatabaseDir();
+
+    /**
+     * Gets the path for the flows directory
+     *
+     * @return the path for the flows directory
+     */
+    Path getFlowsDir();
+
+    /**
+     * Gets the path for the hub staging modules
+     *
+     * @return the path for the hub staging modules
+     */
+    @Deprecated
+    Path getHubStagingModulesDir();
+
+    /**
+     * Gets the path for the user staging modules
+     *
+     * @return the path for the user staging modules
+     */
+    @Deprecated
+    Path getUserStagingModulesDir();
+
+    /**
+     * Gets the path for the modules directory
+     *
+     * @return the path for the modules directory
+     */
+    Path getModulesDir();
+
+    /**
+     * Gets the path for the user final modules
+     *
+     * @return the path for the user final modules
+     */
+    @Deprecated
+    Path getUserFinalModulesDir();
+
+    /**
+     * Gets the path for the custom modules directory
+     *
+     * @return the path for the custom modules directory
+     */
+    Path getCustomModulesDir();
+
+    /**
+     * @return the path of the directory for the user to store mapping function library modules
+     */
+    Path getCustomMappingFunctionsDir();
+
+    /**
+     * Checks if the project has been initialized or not
+     *
+     * @return true if initialized, false if not
+     */
+    boolean isInitialized();
 
     /**
      * Initializes a directory as a hub project directory.
      * This means putting certain files and folders in place.
+     *
      * @param customTokens - some custom tokens to start with
      */
-    public void init(Map<String, String> customTokens) {
-        this.pluginsDir.toFile().mkdirs();
+    void init(Map<String, String> customTokens);
 
-        Path serversDir = getHubServersDir();
-        serversDir.toFile().mkdirs();
-        writeResourceFile("ml-config/servers/staging-server.json", serversDir.resolve("staging-server.json"), true);
-        writeResourceFile("ml-config/servers/final-server.json", serversDir.resolve("final-server.json"), true);
-        writeResourceFile("ml-config/servers/trace-server.json", serversDir.resolve("trace-server.json"), true);
-        writeResourceFile("ml-config/servers/job-server.json", serversDir.resolve("job-server.json"), true);
+    /**
+     * Performs an upgrade to a pre-4.0 project by copying folders
+     * to their new positions as defined in hubproject.
+     *
+     * @throws IOException if problem happens with the on-disk project.
+     */
+    void upgradeProject() throws IOException;
 
-        Path databasesDir = getHubDatabaseDir();
-        databasesDir.toFile().mkdirs();
-        writeResourceFile("ml-config/databases/staging-database.json", databasesDir.resolve("staging-database.json"), true);
-        writeResourceFile("ml-config/databases/final-database.json", databasesDir.resolve("final-database.json"), true);
-        writeResourceFile("ml-config/databases/trace-database.json", databasesDir.resolve("trace-database.json"), true);
-        writeResourceFile("ml-config/databases/job-database.json", databasesDir.resolve("job-database.json"), true);
-        writeResourceFile("ml-config/databases/modules-database.json", databasesDir.resolve("modules-database.json"), true);
-        writeResourceFile("ml-config/databases/schemas-database.json", databasesDir.resolve("schemas-database.json"), true);
-        writeResourceFile("ml-config/databases/triggers-database.json", databasesDir.resolve("triggers-database.json"), true);
+    String getHubModulesDeployTimestampFile();
 
-        Path securityDir = getHubSecurityDir();
-        Path rolesDir = securityDir.resolve("roles");
-        Path usersDir = securityDir.resolve("users");
+    String getUserModulesDeployTimestampFile();
 
-        rolesDir.toFile().mkdirs();
-        usersDir.toFile().mkdirs();
+    void setUserModulesDeployTimestampFile(String userModulesDeployTimestampFile);
 
-        writeResourceFile("ml-config/security/roles/data-hub-role.json", rolesDir.resolve("data-hub-role.json"), true);
-        writeResourceFile("ml-config/security/users/data-hub-user.json", usersDir.resolve("data-hub-user.json"), true);
+    Path getEntityDir(String entityName);
 
-        Path mimetypesDir = getHubMimetypesDir();
-        mimetypesDir.toFile().mkdirs();
-        writeResourceFile("ml-config/mimetypes/woff.json", mimetypesDir.resolve("woff.json"), true);
-        writeResourceFile("ml-config/mimetypes/woff2.json", mimetypesDir.resolve("woff2.json"), true);
+    Path getMappingDir(String mappingName);
 
-        getUserServersDir().toFile().mkdirs();
-        getUserDatabaseDir().toFile().mkdirs();
+    Path getLegacyMappingDir(String mappingName);
 
-        Path gradlew = projectDir.resolve("gradlew");
-        writeResourceFile("scaffolding/gradlew", gradlew);
-        makeExecutable(gradlew);
+    Path getCustomModuleDir(String stepName, String stepType);
 
-        Path gradlewbat = projectDir.resolve("gradlew.bat");
-        writeResourceFile("scaffolding/gradlew.bat", gradlewbat);
-        makeExecutable(gradlewbat);
+    /**
+     * Returns the base directory for this project
+     *
+     * @return the project's directory as a Path
+     */
+    Path getProjectDir();
 
-        Path gradleWrapperDir = projectDir.resolve("gradle").resolve("wrapper");
-        gradleWrapperDir.toFile().mkdirs();
-
-        writeResourceFile("scaffolding/gradle/wrapper/gradle-wrapper.jar", gradleWrapperDir.resolve("gradle-wrapper.jar"));
-        writeResourceFile("scaffolding/gradle/wrapper/gradle-wrapper.properties", gradleWrapperDir.resolve("gradle-wrapper.properties"));
-
-        writeResourceFile("scaffolding/build_gradle", projectDir.resolve("build.gradle"));
-        writeResourceFileWithReplace(customTokens, "scaffolding/gradle_properties", projectDir.resolve("gradle.properties"));
-        writeResourceFile("scaffolding/gradle-local_properties", projectDir.resolve("gradle-local.properties"));
-    }
-
-    private void makeExecutable(Path file) {
-        Set<PosixFilePermission> perms = new HashSet<>();
-        perms.add(PosixFilePermission.OWNER_READ);
-        perms.add(PosixFilePermission.OWNER_WRITE);
-        perms.add(PosixFilePermission.OWNER_EXECUTE);
-
-        try {
-            Files.setPosixFilePermissions(file, perms);
-        } catch (Exception e) {
-
-        }
-    }
-
-    private void writeResourceFile(String srcFile, Path dstFile) {
-        writeResourceFile(srcFile, dstFile, false);
-    }
-
-    private void writeResourceFile(String srcFile, Path dstFile, boolean overwrite) {
-        if (overwrite || !dstFile.toFile().exists()) {
-            logger.info("Getting file: " + srcFile);
-            InputStream inputStream = HubProject.class.getClassLoader().getResourceAsStream(srcFile);
-            FileUtil.copy(inputStream, dstFile.toFile());
-        }
-    }
-
-    private void writeResourceFileWithReplace(Map<String, String> customTokens, String srcFile, Path dstFile) {
-        writeResourceFileWithReplace(customTokens, srcFile, dstFile, false);
-    }
-
-    private void writeResourceFileWithReplace(Map<String, String> customTokens, String srcFile, Path dstFile, boolean overwrite) {
-        try {
-            if (overwrite || !dstFile.toFile().exists()) {
-                logger.info("Getting file with Replace: " + srcFile);
-                InputStream inputStream = HubProject.class.getClassLoader().getResourceAsStream(srcFile);
-
-                String fileContents = IOUtils.toString(inputStream);
-                for (String key : customTokens.keySet()) {
-
-                    String value = customTokens.get(key);
-                    if (value != null) {
-                        fileContents = fileContents.replace(key, value);
-                    }
-                }
-                FileWriter writer = new FileWriter(dstFile.toFile());
-                writer.write(fileContents);
-                writer.close();
-            }
-        }
-        catch(IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
+    void createProject(String projectDirString);
 }

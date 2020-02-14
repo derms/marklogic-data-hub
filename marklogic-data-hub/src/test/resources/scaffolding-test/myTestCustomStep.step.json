@@ -1,0 +1,12 @@
+{
+  "name": "myTestCustomStep",
+  "type": "CUSTOM",
+  "version": 1,
+  "options": {
+    "sourceQuery" : "cts.collectionQuery('default-ingestion')",
+    "collections" : [ "myTestCustomStep" ]
+  },
+  "customHook" : { },
+  "lang" : "zxx",
+  "modulePath" : "/path/to/your/step/module/main.sjs"
+}
