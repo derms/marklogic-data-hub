@@ -44,13 +44,15 @@ import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Date;
-
+import java.util.List;
 
 /**
- * Extends ml-app-deployer's LoadModulesCommand, which expects to load from every path defined by "mlModulePaths", so
- * that it can also load from two DHF-specific locations - "./plugins" and "src/main/entity-config". Unfortunately,
- * those directories don't conform to the structure expected by ml-app-deployer (technically by DefaultModulesLoader
- * in ml-javaclient-util), so they require special handling, which this class provides.
+ * Extends ml-app-deployer's LoadModulesCommand, which expects to load from
+ * every path defined by "mlModulePaths", so that it can also load from two
+ * DHF-specific locations - "./plugins" and "src/main/entity-config".
+ * Unfortunately, those directories don't conform to the structure expected by
+ * ml-app-deployer (technically by DefaultModulesLoader in ml-javaclient-util),
+ * so they require special handling, which this class provides.
  */
 @Component
 public class LoadUserModulesCommand extends LoadModulesCommand {
@@ -88,8 +90,10 @@ public class LoadUserModulesCommand extends LoadModulesCommand {
         if (forceLoad) {
             pmm.deletePropertiesFile();
 
-            // Need to delete ml-javaclient-utils timestamp file as well as modules present in the standard gradle locations are now
-            // loaded by the modules loader in the parent class which adds these entries to the ml-javaclient-utils timestamp file
+            // Need to delete ml-javaclient-utils timestamp file as well as modules present
+            // in the standard gradle locations are now
+            // loaded by the modules loader in the parent class which adds these entries to
+            // the ml-javaclient-utils timestamp file
             String filePath = hubConfig.getAppConfig().getModuleTimestampsPath();
             if (filePath != null) {
                 File defaultTimestampFile = new File(filePath);
@@ -105,7 +109,8 @@ public class LoadUserModulesCommand extends LoadModulesCommand {
     private AssetFileLoader getAssetFileLoader(AppConfig config, PropertiesModuleManager moduleManager) {
         AssetFileLoader assetFileLoader = new AssetFileLoader(hubConfig.newModulesDbClient(), moduleManager);
         assetFileLoader.addDocumentFileProcessor(new CacheBusterDocumentFileProcessor());
-        //Add file extensions to HubFileFilter.accept() to prevent mappings, entities  files being loaded to Modules db
+        // Add file extensions to HubFileFilter.accept() to prevent mappings, entities
+        // files being loaded to Modules db
         assetFileLoader.addFileFilter(new HubFileFilter());
         assetFileLoader.setPermissions(config.getModulePermissions());
         return assetFileLoader;
@@ -140,23 +145,25 @@ public class LoadUserModulesCommand extends LoadModulesCommand {
 
     boolean isFlowPropertiesFile(Path dir) {
         Path parent = dir.getParent();
-        return dir.toFile().isFile() &&
-            dir.getFileName().toString().endsWith(".properties") &&
-            parent.toString().matches(".*[/\\\\](input|harmonize)[/\\\\][^/\\\\]+$") &&
-            dir.getFileName().toString().equals(parent.getFileName().toString() + ".properties");
+        return dir.toFile().isFile() && dir.getFileName().toString().endsWith(".properties")
+                && parent.toString().matches(".*[/\\\\](input|harmonize)[/\\\\][^/\\\\]+$")
+                && dir.getFileName().toString().equals(parent.getFileName().toString() + ".properties");
     }
 
     /**
-     * Ask the parent class to load modules first, which should consist of reading from every path defined by
-     * mlModulePaths / appConfig.getModulePaths. By default, that's just src/main/ml-modules. If any mlRestApi
-     * dependencies are included, those will be in the set of module paths as well.
+     * Ask the parent class to load modules first, which should consist of reading
+     * from every path defined by mlModulePaths / appConfig.getModulePaths. By
+     * default, that's just src/main/ml-modules. If any mlRestApi dependencies are
+     * included, those will be in the set of module paths as well.
      *
-     * The one catch here is that if any REST extensions under ./plugins have dependencies on mlRestApi libraries or
-     * library modules in ml-modules, those extensions will fail to load. However, REST extensions under ./plugins
-     * aren't technically supported anymore, so this should not be an issue.
+     * The one catch here is that if any REST extensions under ./plugins have
+     * dependencies on mlRestApi libraries or library modules in ml-modules, those
+     * extensions will fail to load. However, REST extensions under ./plugins aren't
+     * technically supported anymore, so this should not be an issue.
      *
-     * The loadAllModules bit is included solely to preserve the functionality of the DeployUserModulesTask - i.e.
-     * only load from the hub-specific module locations.
+     * The loadAllModules bit is included solely to preserve the functionality of
+     * the DeployUserModulesTask - i.e. only load from the hub-specific module
+     * locations.
      */
     private void loadModulesFromStandardMlGradleLocations(CommandContext context) {
         super.execute(context);
@@ -177,14 +184,18 @@ public class LoadUserModulesCommand extends LoadModulesCommand {
         // load any user files under plugins/* int the modules database.
         // this will ignore REST folders under entities
         DefaultModulesLoader modulesLoader = getStagingModulesLoader(config);
-        // Load modules from standard ml-gradle location after 'PropertiesModuleManager' is initialized. This will ensure
-        // that in case of 'forceLoad', the ml-javaclient-utils timestamp file is deleted first.
+        setModulesLoader(modulesLoader);
+        // Load modules from standard ml-gradle location after 'PropertiesModuleManager'
+        // is initialized. This will ensure
+        // that in case of 'forceLoad', the ml-javaclient-utils timestamp file is
+        // deleted first.
         if (loadAllModules) {
             loadModulesFromStandardMlGradleLocations(context);
         }
         modulesLoader.loadModules(baseDir, new UserModulesFinder(), stagingClient);
 
-        // Don't load these while "watching" modules (i.e. mlWatch is being run), as users can't change these
+        // Don't load these while "watching" modules (i.e. mlWatch is being run), as
+        // users can't change these
         if (!watchingModules) {
             modulesLoader.loadModules("classpath*:/ml-modules-final", new SearchOptionsFinder(), finalClient);
         }
@@ -210,13 +221,14 @@ public class LoadUserModulesCommand extends LoadModulesCommand {
 
                 ModulesManager modulesManager = modulesLoader.getModulesManager();
 
-                //first let's do the entities and flows + extensions
+                // first let's do the entities and flows + extensions
                 Files.walkFileTree(startPath, new SimpleFileVisitor<Path>() {
                     @Override
                     public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
                         String currentDir = dir.normalize().toAbsolutePath().toString();
 
-                        // for REST dirs we need to deploy all the REST stuff (transforms, options, services, etc)
+                        // for REST dirs we need to deploy all the REST stuff (transforms, options,
+                        // services, etc)
                         if (isInputRestDir(dir)) {
                             modulesLoader.loadModules(currentDir, allButAssetsModulesFinder, stagingClient);
                             return FileVisitResult.SKIP_SUBTREE;
@@ -225,15 +237,15 @@ public class LoadUserModulesCommand extends LoadModulesCommand {
                         else if (isHarmonizeRestDir(dir)) {
                             modulesLoader.loadModules(currentDir, allButAssetsModulesFinder, finalClient);
                             return FileVisitResult.SKIP_SUBTREE;
-                        }
-                        else {
+                        } else {
                             return FileVisitResult.CONTINUE;
                         }
                     }
 
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                        if (isFlowPropertiesFile(file) && modulesManager.hasFileBeenModifiedSinceLastLoaded(file.toFile())) {
+                        if (isFlowPropertiesFile(file)
+                                && modulesManager.hasFileBeenModifiedSinceLastLoaded(file.toFile())) {
                             LegacyFlow flow = flowManager.getFlowFromProperties(file);
                             StringHandle handle = new StringHandle(flow.serialize());
                             handle.setFormat(Format.XML);
@@ -250,7 +262,7 @@ public class LoadUserModulesCommand extends LoadModulesCommand {
             threadPoolTaskExecutor.shutdown();
         } catch (IOException e) {
             e.printStackTrace();
-            //throw new RuntimeException(e);
+            // throw new RuntimeException(e);
         }
     }
 
@@ -266,4 +278,3 @@ public class LoadUserModulesCommand extends LoadModulesCommand {
         this.loadAllModules = loadAllModules;
     }
 }
-
