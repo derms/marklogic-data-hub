@@ -118,6 +118,7 @@ publishing {
         }
     }
     repositories {
+         mavenLocal()
         maven {
           if(project.hasProperty("mavenUser")) {
             credentials {
@@ -159,3 +160,9 @@ pluginBundle {
         }
     }
 }
+
+
+task sampleTest(type: Test, dependsOn: testClasses) {
+    include '**/*Basic*'
+}
+//gradle sampleTest -x ":marklogic-data-hub:buildUI" -x ":marklogic-data-hub:jar" 
